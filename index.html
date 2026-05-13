@@ -1,302 +1,190 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Via • Росток Жизни</title>
-
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
-
-  <style>
-    body {
-      font-family: Inter, system-ui, sans-serif;
-    }
-
-    .glass {
-      background: rgba(255,255,255,0.08);
-      backdrop-filter: blur(20px);
-    }
-
-    .chat-bg {
-      background: linear-gradient(145deg, #0f172a 0%, #1e2937 100%);
-    }
-
-    .message-bubble {
-      border-radius: 20px 20px 20px 4px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Via • Росток Жизни</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet"
+  href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
+<style>
+  body {
+    font-family: Inter, system-ui, sans-serif;
+  }
+  .glass {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(20px);
+  }
+  .chat-bg {
+    background: linear-gradient(145deg, #0f172a 0%, #1e2937 100%);
+  }
+  .message-bubble {
+    border-radius: 20px 20px 20px 4px;
+  }
+</style>
 </head>
-
 <body class="bg-black text-white min-h-screen overflow-hidden">
-
 <div class="flex flex-col h-screen chat-bg">
 
   <!-- HEADER -->
   <div class="sticky top-0 z-50 glass border-b border-white/10 px-4 py-3 flex items-center justify-between">
-
     <div class="flex items-center gap-3">
       <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-2xl shadow-lg">
         🌱
       </div>
-
       <div>
-        <h1 class="font-semibold text-lg">
-          Via • Росток Жизни
-        </h1>
-
-        <div class="text-xs text-emerald-400">
-          Global Realtime Chat
-        </div>
+        <h1 class="font-semibold text-lg">Via • Росток Жизни</h1>
+        <div class="text-xs text-emerald-400">Global Realtime Chat</div>
       </div>
     </div>
-
     <button onclick="connectTON()"
-            class="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-3xl text-sm">
-
+      class="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-3xl text-sm">
       <i class="fa-solid fa-wallet"></i>
       <span>TON Connect</span>
-
     </button>
-
   </div>
 
   <!-- MESSAGES -->
-  <div id="messages"
-       class="flex-1 overflow-y-auto p-4 space-y-4 pb-32">
-  </div>
+  <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 pb-32"></div>
 
   <!-- INPUT -->
   <div class="fixed bottom-0 left-0 right-0 glass border-t border-white/10 p-4">
-
     <div class="max-w-2xl mx-auto flex gap-3">
-
       <input
         id="input"
         type="text"
         placeholder="Напишите сообщение..."
         class="flex-1 bg-white/10 border border-white/10 focus:border-emerald-500 rounded-3xl px-6 py-4 text-[17px] outline-none"
       />
-
       <button onclick="sendMessage()"
-              class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center active:scale-95">
-
+        class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center active:scale-95">
         <i class="fa-solid fa-paper-plane text-xl"></i>
-
       </button>
-
     </div>
-
   </div>
 
 </div>
 
 <script>
+// ==========================================
+// SUPABASE
+// ==========================================
+const supabaseUrl  = 'https://vwarulougzcsohoybxmv.supabase.co';
+const supabaseKey  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3YXJ1bG91Z3pjc29ob3lieG12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NjY0MzMsImV4cCI6MjA5NDI0MjQzM30.tP-qdcfAruG2zA41FXkqM8fRGCi23Yjm8neQNidB2s0'; // <-- вставьте ваш anon ключ сюда
+const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-  // ==========================================
-  // SUPABASE
-  // ==========================================
+// ==========================================
+// USER
+// ==========================================
+const username = "Гость-" + Math.floor(Math.random() * 9999);
+const userId   = crypto.randomUUID(); // гостевой user_id
 
-  const supabaseUrl =
-    'https://vwarulougzcsohoybxmv.supabase.co';
+// ==========================================
+// DOM
+// ==========================================
+const messagesDiv = document.getElementById('messages');
+const input       = document.getElementById('input');
 
-  const supabaseKey =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ3YXJ1bG91Z3pjc29ob3lieG12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NjY0MzMsImV4cCI6MjA5NDI0MjQzM30.tP-qdcfAruG2zA41FXkqM8fRGCi23Yjm8neQNidB2s0';
+// ==========================================
+// SAFE ESCAPE
+// ==========================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
-  const supabaseClient =
-    supabase.createClient(
-      supabaseUrl,
-      supabaseKey
-    );
-
-  // ==========================================
-  // DOM
-  // ==========================================
-
-  const messagesDiv =
-    document.getElementById('messages');
-
-  const input =
-    document.getElementById('input');
-
-  // ==========================================
-  // USER
-  // ==========================================
-
-  const username =
-    "Гость-" + Math.floor(Math.random() * 9999);
-
-  // ==========================================
-  // SAFE ESCAPE
-  // ==========================================
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
-
-  // ==========================================
-  // RENDER MESSAGE
-  // ==========================================
-
-  function renderMessage(msg) {
-
-    const isMe =
-      msg.username === username;
-
-    const wrapper =
-      document.createElement('div');
-
-    wrapper.className =
-      `flex ${isMe ? 'justify-end' : 'justify-start'}`;
-
-    wrapper.innerHTML = `
-      <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]'}">
-
-        ${!isMe
-          ? `<div class="text-xs text-gray-400 mb-1 px-2">
-               ${escapeHtml(msg.username)}
-             </div>`
-          : ''
-        }
-
-        <div class="glass px-5 py-3 message-bubble
-             ${isMe
-               ? 'bg-emerald-600 rounded-tr-none'
-               : 'bg-white/10 rounded-tl-none'}">
-
-          <p class="text-[17px] break-words">
-            ${escapeHtml(msg.text)}
-          </p>
-
-        </div>
-
-        <div class="text-[10px] text-gray-500 mt-1 px-2">
-          ${new Date(msg.created_at)
-            .toLocaleTimeString('ru-RU', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-        </div>
-
-      </div>
-    `;
-
-    messagesDiv.appendChild(wrapper);
-
-    messagesDiv.scrollTop =
-      messagesDiv.scrollHeight;
-  }
-
-  // ==========================================
-  // LOAD MESSAGES
-  // ==========================================
-
-  async function loadMessages() {
-
-    const { data, error } =
-      await supabaseClient
-        .from('messages')
-        .select('*')
-        .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error(error);
-      return;
-    }
-
-    messagesDiv.innerHTML = '';
-
-    data.forEach(renderMessage);
-  }
-
-  // ==========================================
-  // SEND MESSAGE
-  // ==========================================
-
-  async function sendMessage() {
-
-    const text =
-      input.value.trim();
-
-    if (!text) return;
-
-    input.value = '';
-
-    const { error } =
-      await supabaseClient
-        .from('messages')
-        .insert([
-          {
-            username,
-            text
-          }
-        ]);
-
-    if (error) {
-      console.error(error);
-      alert(error.message);
-    }
-  }
-
-  // ==========================================
-  // ENTER
-  // ==========================================
-
-  input.addEventListener('keypress', e => {
-
-    if (e.key === 'Enter') {
-      sendMessage();
-    }
-
-  });
-
-  // ==========================================
-  // REALTIME
-  // ==========================================
-
-  supabaseClient
-    .channel('chat-room')
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages'
-      },
-      payload => {
-
-        renderMessage(payload.new);
-
+// ==========================================
+// RENDER MESSAGE
+// ==========================================
+function renderMessage(msg) {
+  const isMe = msg.username === username;
+  const wrapper = document.createElement('div');
+  wrapper.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+  wrapper.innerHTML = `
+    <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]'}">
+      ${!isMe
+        ? `<div class="text-xs text-gray-400 mb-1 px-2">${escapeHtml(msg.username)}</div>`
+        : ''
       }
-    )
-    .subscribe();
+      <div class="glass px-5 py-3 message-bubble
+        ${isMe
+          ? 'bg-emerald-600 rounded-tr-none'
+          : 'bg-white/10 rounded-tl-none'}">
+        <p class="text-[17px] break-words">${escapeHtml(msg.text)}</p>
+      </div>
+      <div class="text-[10px] text-gray-500 mt-1 px-2">
+        ${new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+      </div>
+    </div>
+  `;
+  messagesDiv.appendChild(wrapper);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
 
-  // ==========================================
-  // TON
-  // ==========================================
+// ==========================================
+// LOAD MESSAGES
+// ==========================================
+async function loadMessages() {
+  const { data, error } = await supabaseClient
+    .from('messages')
+    .select('*')
+    .order('created_at', { ascending: true });
 
-  function connectTON() {
+  if (error) { console.error(error); return; }
+  messagesDiv.innerHTML = '';
+  data.forEach(renderMessage);
+}
 
-    alert(
-      "🌟 TON Connect\n\n" +
-      "Подключение TON будет добавлено позже."
-    );
+// ==========================================
+// SEND MESSAGE
+// ==========================================
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
 
+  const { error } = await supabaseClient
+    .from('messages')
+    .insert([{ username, text, user_id: userId }]);
+
+  if (error) {
+    console.error(error);
+    alert(error.message);
   }
+}
 
-  // ==========================================
-  // INIT
-  // ==========================================
+// ==========================================
+// ENTER
+// ==========================================
+input.addEventListener('keypress', e => {
+  if (e.key === 'Enter') sendMessage();
+});
 
-  loadMessages();
+// ==========================================
+// REALTIME
+// ==========================================
+supabaseClient
+  .channel('chat-room')
+  .on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'messages' },
+    payload => { renderMessage(payload.new); }
+  )
+  .subscribe();
 
+// ==========================================
+// TON
+// ==========================================
+function connectTON() {
+  alert("🌟 TON Connect\n\nПодключение TON будет добавлено позже.");
+}
+
+// ==========================================
+// INIT
+// ==========================================
+loadMessages();
 </script>
-
 </body>
 </html>
