@@ -34,7 +34,7 @@
         </div>
       </div>
       
-      <button onclick="connectTON()" 
+      <button id="ton-btn"
               class="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-3xl text-sm font-medium transition-all active:scale-95">
         <i class="fa-solid fa-wallet"></i>
         <span id="wallet-btn">TON Connect</span>
@@ -52,9 +52,8 @@
           type="text" 
           placeholder="Напишите сообщение..." 
           class="flex-1 bg-white/10 border border-white/10 focus:border-emerald-500 rounded-3xl px-6 py-4 text-[17px] placeholder:text-gray-400 focus:outline-none transition-all"
-          onkeypress="if(event.key === 'Enter') sendMessage()"
         />
-        <button onclick="sendMessage()"
+        <button id="send-btn"
                 class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center active:scale-95 transition-all shadow-xl">
           <i class="fa-solid fa-paper-plane text-xl"></i>
         </button>
@@ -63,45 +62,54 @@
   </div>
 
   <script>
-    // === Supabase ===
     const supabase = createClient(
       'https://vwarulougzcsohoybxmv.supabase.co',
       'sb_publishable_McRGklsHAddHiLKspw3G9w_JIfRKnX_'
     );
 
     let currentUser = null;
-    let messagesContainer = document.getElementById('messages');
+    const messagesContainer = document.getElementById('messages');
+    const input = document.getElementById('input');
 
-    async function initTelegram() {
-      if (window.Telegram?.WebApp) {
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        
-        currentUser = tg.initDataUnsafe?.user;
-        console.log("Telegram User:", currentUser);
+    function getCurrentUser() {
+      if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
+        return window.Telegram.WebApp.initDataUnsafe.user;
       }
+      return {
+        id: 'guest_' + Math.random().toString(36).substr(2, 9),
+        username: 'Гость',
+        first_name: 'Гость'
+      };
     }
 
-    // Загрузка старых сообщений
     async function loadMessages() {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .order('created_at', { ascending: true });
-
+      
       if (error) console.error(error);
       else renderMessages(data || []);
     }
 
     function renderMessages(msgs) {
       messagesContainer.innerHTML = '';
+      if (msgs.length === 0) {
+        messagesContainer.innerHTML = `
+          <div class="h-full flex flex-col items-center justify-center text-center text-gray-400 pt-20">
+            <div class="text-6xl mb-6 opacity-50">🌱</div>
+            <p class="text-xl">Пока пусто</p>
+            <p class="text-sm mt-2">Напишите первое сообщение</p>
+          </div>`;
+        return;
+      }
+
       msgs.forEach(msg => {
-        const isMe = currentUser && msg.user_id === String(currentUser.id);
+        const isMe = String(msg.user_id) === String(currentUser.id);
         const div = document.createElement('div');
         div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
         div.innerHTML = `
-          <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]}">
+          <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]'}">
             ${!isMe ? `<div class="text-xs text-gray-400 mb-1 px-2">${msg.username || 'Аноним'}</div>` : ''}
             <div class="glass px-5 py-3 message-bubble ${isMe ? 'bg-emerald-600/90 rounded-tr-none' : 'bg-white/10 rounded-tl-none'}">
               <p class="text-[17px] leading-tight">${msg.text}</p>
@@ -114,50 +122,55 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    // Отправка сообщения
     async function sendMessage() {
-      const input = document.getElementById('input');
-      if (!input.value.trim() || !currentUser) return;
+      if (!input.value.trim()) return;
 
       const { error } = await supabase.from('messages').insert({
         user_id: String(currentUser.id),
-        username: currentUser.username || currentUser.first_name,
+        username: currentUser.username || currentUser.first_name || 'Гость',
         text: input.value.trim()
       });
 
-      if (error) alert("Ошибка отправки");
-      else input.value = '';
+      if (error) {
+        console.error(error);
+        alert("Ошибка отправки: " + error.message);
+      } else {
+        input.value = '';
+      }
     }
 
-    // Realtime подписка
-    function subscribeToMessages() {
-      supabase
-        .channel('messages-channel')
-        .on('postgres_changes', 
-          { event: 'INSERT', schema: 'public', table: 'messages' }, 
-          (payload) => {
-            loadMessages(); // простая перезагрузка для MVP
-          }
-        )
-        .subscribe();
-    }
-
-    // TON Connect
     function connectTON() {
-      alert("TON Connect\n\nВ реальном приложении здесь откроется окно подключения кошелька (Tonkeeper, Telegram Wallet)");
-      document.getElementById('wallet-btn').innerHTML = '✓ Подключён';
+      const btn = document.getElementById('wallet-btn');
+      btn.textContent = '✓ Подключён';
+      btn.parentElement.style.color = '#34d399';
+      alert("🌟 TON Connect\n\nПодключение кошелька (в разработке)");
     }
 
     // Инициализация
     window.onload = async () => {
-      await initTelegram();
+      if (window.Telegram?.WebApp) {
+        window.Telegram.WebApp.ready();
+        window.Telegram.WebApp.expand();
+      }
+
+      currentUser = getCurrentUser();
+
       await loadMessages();
-      subscribeToMessages();
-      
-      // Имитация онлайн
+      supabase.channel('messages-channel')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadMessages())
+        .subscribe();
+
+      // Кнопки
+      document.getElementById('send-btn').addEventListener('click', sendMessage);
+      input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendMessage();
+      });
+      document.getElementById('ton-btn').addEventListener('click', connectTON);
+
+      // Онлайн
       setInterval(() => {
-        document.getElementById('online-count').textContent = Math.floor(1200 + Math.random()*800) + " онлайн";
-      }, 7000);
+        document.getElementById('online-count').textContent = Math.floor(900 + Math.random() * 800) + " онлайн";
+      }, 8000);
     };
   </script>
 </body>
