@@ -62,6 +62,8 @@
   </div>
 
   <script>
+    // Supabase Client
+    const { createClient } = Supabase;
     const supabase = createClient(
       'https://vwarulougzcsohoybxmv.supabase.co',
       'sb_publishable_McRGklsHAddHiLKspw3G9w_JIfRKnX_'
@@ -69,7 +71,7 @@
 
     let currentUser = null;
     const messagesContainer = document.getElementById('messages');
-    const input = document.getElementById('input');
+    const inputField = document.getElementById('input');
 
     function getCurrentUser() {
       if (window.Telegram?.WebApp?.initDataUnsafe?.user) {
@@ -88,7 +90,7 @@
         .select('*')
         .order('created_at', { ascending: true });
       
-      if (error) console.error(error);
+      if (error) console.error("Ошибка загрузки:", error);
       else renderMessages(data || []);
     }
 
@@ -123,26 +125,25 @@
     }
 
     async function sendMessage() {
-      if (!input.value.trim()) return;
+      if (!inputField.value.trim()) return;
 
       const { error } = await supabase.from('messages').insert({
         user_id: String(currentUser.id),
         username: currentUser.username || currentUser.first_name || 'Гость',
-        text: input.value.trim()
+        text: inputField.value.trim()
       });
 
       if (error) {
         console.error(error);
         alert("Ошибка отправки: " + error.message);
       } else {
-        input.value = '';
+        inputField.value = '';
       }
     }
 
     function connectTON() {
       const btn = document.getElementById('wallet-btn');
       btn.textContent = '✓ Подключён';
-      btn.parentElement.style.color = '#34d399';
       alert("🌟 TON Connect\n\nПодключение кошелька (в разработке)");
     }
 
@@ -156,18 +157,22 @@
       currentUser = getCurrentUser();
 
       await loadMessages();
+
+      // Realtime
       supabase.channel('messages-channel')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => loadMessages())
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+          loadMessages();
+        })
         .subscribe();
 
       // Кнопки
       document.getElementById('send-btn').addEventListener('click', sendMessage);
-      input.addEventListener('keypress', (e) => {
+      inputField.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') sendMessage();
       });
       document.getElementById('ton-btn').addEventListener('click', connectTON);
 
-      // Онлайн
+      // Онлайн счётчик
       setInterval(() => {
         document.getElementById('online-count').textContent = Math.floor(900 + Math.random() * 800) + " онлайн";
       }, 8000);
