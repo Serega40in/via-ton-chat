@@ -1,20 +1,18 @@
 <!DOCTYPE html>
-<html lang="ru" class="dark">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Via • Росток Жизни</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
     body { font-family: 'Inter', system-ui, sans-serif; }
     .glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); }
     .message-bubble { border-radius: 20px 20px 20px 4px; }
-    .chat-bg {
-      background: linear-gradient(145deg, #0f172a 0%, #1e2937 100%);
-    }
-    .sprout { filter: drop-shadow(0 0 8px #22c55e); }
+    .chat-bg { background: linear-gradient(145deg, #0f172a 0%, #1e2937 100%); }
   </style>
 </head>
 <body class="bg-black text-white min-h-screen overflow-hidden">
@@ -24,26 +22,27 @@
     <!-- Header -->
     <div class="sticky top-0 z-50 glass border-b border-white/10 px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-green-600 flex items-center justify-center text-2xl sprout">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center text-2xl shadow-lg">
           🌱
         </div>
         <div>
-          <h1 class="font-semibold text-xl tracking-tight">Via</h1>
-          <p class="text-xs text-emerald-400 -mt-0.5">Росток Жизни</p>
+          <h1 class="font-semibold text-lg tracking-tight">Via • Росток Жизни</h1>
+          <div class="flex items-center gap-1 text-xs text-emerald-400">
+            <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
+            <span id="online-count">Онлайн</span>
+          </div>
         </div>
       </div>
       
-      <button onclick="connectWallet()" 
+      <button onclick="connectTON()" 
               class="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-3xl text-sm font-medium transition-all active:scale-95">
         <i class="fa-solid fa-wallet"></i>
-        <span id="wallet-btn">Подключить TON</span>
+        <span id="wallet-btn">TON Connect</span>
       </button>
     </div>
 
     <!-- Messages -->
-    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-6 pb-28 scrollbar-thin scrollbar-thumb-white/20">
-      <!-- JS added -->
-    </div>
+    <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-6 pb-28 scrollbar-thin scrollbar-thumb-white/20"></div>
 
     <!-- Input -->
     <div class="fixed bottom-0 left-0 right-0 glass border-t border-white/10 p-4">
@@ -52,40 +51,62 @@
           id="input"
           type="text" 
           placeholder="Напишите сообщение..." 
-          class="flex-1 bg-white/10 border border-white/10 focus:border-emerald-500/50 rounded-3xl px-6 py-4 text-[17px] placeholder:text-gray-400 focus:outline-none transition-all"
+          class="flex-1 bg-white/10 border border-white/10 focus:border-emerald-500 rounded-3xl px-6 py-4 text-[17px] placeholder:text-gray-400 focus:outline-none transition-all"
           onkeypress="if(event.key === 'Enter') sendMessage()"
         />
         <button onclick="sendMessage()"
-                class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-green-600 rounded-3xl flex items-center justify-center active:scale-95 transition-all shadow-xl shadow-emerald-500/30">
+                class="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center active:scale-95 transition-all shadow-xl">
           <i class="fa-solid fa-paper-plane text-xl"></i>
         </button>
       </div>
-      <div class="text-center text-[10px] text-gray-500 mt-3">Via — Мини-чат на TON 🌱</div>
     </div>
   </div>
 
   <script>
-    const messagesContainer = document.getElementById('messages');
-    let walletConnected = false;
+    // === Supabase ===
+    const supabase = createClient(
+      'https://vwarulougzcsohoybxmv.supabase.co',
+      'sb_publishable_McRGklsHAddHiLKspw3G9w_JIfRKnX_'
+    );
 
-    const initialMessages = [
-      { user: "ton_grower", text: "Привет! Это Via — новый чат на TON 🌱", time: "14:21" },
-      { user: "sprout_user", text: "Росток жизни уже прорастает! Кто со мной?", time: "14:22" }
-    ];
+    let currentUser = null;
+    let messagesContainer = document.getElementById('messages');
 
-    function renderMessages() {
+    async function initTelegram() {
+      if (window.Telegram?.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        
+        currentUser = tg.initDataUnsafe?.user;
+        console.log("Telegram User:", currentUser);
+      }
+    }
+
+    // Загрузка старых сообщений
+    async function loadMessages() {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) console.error(error);
+      else renderMessages(data || []);
+    }
+
+    function renderMessages(msgs) {
       messagesContainer.innerHTML = '';
-      initialMessages.forEach(msg => {
-        const isMe = msg.user === "you";
+      msgs.forEach(msg => {
+        const isMe = currentUser && msg.user_id === String(currentUser.id);
         const div = document.createElement('div');
         div.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
         div.innerHTML = `
-          <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]'}">
-            ${!isMe ? `<div class="text-xs text-gray-400 mb-1 px-2">${msg.user}</div>` : ''}
+          <div class="${isMe ? 'max-w-[75%]' : 'max-w-[80%]}">
+            ${!isMe ? `<div class="text-xs text-gray-400 mb-1 px-2">${msg.username || 'Аноним'}</div>` : ''}
             <div class="glass px-5 py-3 message-bubble ${isMe ? 'bg-emerald-600/90 rounded-tr-none' : 'bg-white/10 rounded-tl-none'}">
               <p class="text-[17px] leading-tight">${msg.text}</p>
             </div>
-            <div class="text-[10px] text-gray-500 mt-1 px-2">${msg.time}</div>
+            <div class="text-[10px] text-gray-500 mt-1 px-2">${new Date(msg.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}</div>
           </div>
         `;
         messagesContainer.appendChild(div);
@@ -93,37 +114,49 @@
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
-    function sendMessage() {
+    // Отправка сообщения
+    async function sendMessage() {
       const input = document.getElementById('input');
-      if (!input.value.trim()) return;
+      if (!input.value.trim() || !currentUser) return;
 
-      initialMessages.push({
-        user: "you",
-        text: input.value,
-        time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
+      const { error } = await supabase.from('messages').insert({
+        user_id: String(currentUser.id),
+        username: currentUser.username || currentUser.first_name,
+        text: input.value.trim()
       });
 
-      renderMessages();
-      input.value = '';
+      if (error) alert("Ошибка отправки");
+      else input.value = '';
     }
 
-    function connectWallet() {
-      walletConnected = !walletConnected;
-      document.getElementById('wallet-btn').innerHTML = walletConnected ? '🌱 Connected' : 'Подключить TON';
-      if (walletConnected) alert('✅ TON-кошелёк подключён! (В реальном проекте — TON Connect)');
+    // Realtime подписка
+    function subscribeToMessages() {
+      supabase
+        .channel('messages-channel')
+        .on('postgres_changes', 
+          { event: 'INSERT', schema: 'public', table: 'messages' }, 
+          (payload) => {
+            loadMessages(); // простая перезагрузка для MVP
+          }
+        )
+        .subscribe();
     }
 
-    window.onload = () => {
-      renderMessages();
+    // TON Connect
+    function connectTON() {
+      alert("TON Connect\n\nВ реальном приложении здесь откроется окно подключения кошелька (Tonkeeper, Telegram Wallet)");
+      document.getElementById('wallet-btn').innerHTML = '✓ Подключён';
+    }
+
+    // Инициализация
+    window.onload = async () => {
+      await initTelegram();
+      await loadMessages();
+      subscribeToMessages();
+      
+      // Имитация онлайн
       setInterval(() => {
-        if (Math.random() > 0.65) {
-          initialMessages.push({
-            user: "grower_" + Math.floor(Math.random()*999),
-            text: ["🌱 Растём вместе!", "Via — будущее чатов на TON", "Кто создаёт свой Jetton?"][Math.floor(Math.random()*3)],
-            time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-          });
-          renderMessages();
-        }
+        document.getElementById('online-count').textContent = Math.floor(1200 + Math.random()*800) + " онлайн";
       }, 7000);
     };
   </script>
