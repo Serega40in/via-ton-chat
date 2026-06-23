@@ -6,6 +6,7 @@
 <title>Via • Росток Жизни</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@tonconnect/ui@2/dist/tonconnect-ui.min.js"></script>
 <link rel="stylesheet"
   href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" />
 <style>
@@ -41,7 +42,7 @@
     <button onclick="connectTON()"
       class="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 rounded-3xl text-sm">
       <i class="fa-solid fa-wallet"></i>
-      <span>TON Connect</span>
+      <span id="ton-btn-label">TON Connect</span>
     </button>
   </div>
 
@@ -175,11 +176,34 @@ supabaseClient
   .subscribe();
 
 // ==========================================
-// TON
+// TON CONNECT
 // ==========================================
-function connectTON() {
-  alert("🌟 TON Connect\n\nПодключение TON будет добавлено позже.");
+// Подключение кошелька через официальный TON Connect UI.
+// manifestUrl должен быть публично доступен по HTTPS (см. tonconnect-manifest.json
+// и заметку в PR про GitHub Pages).
+const tonConnectUI = new TON_CONNECT_UI.TonConnectUI({
+  manifestUrl: 'https://serega40in.github.io/via-ton-chat/tonconnect-manifest.json',
+});
+
+async function connectTON() {
+  // Уже подключён → по клику отключаем; иначе открываем модалку выбора кошелька.
+  if (tonConnectUI.connected) {
+    await tonConnectUI.disconnect();
+  } else {
+    await tonConnectUI.openModal();
+  }
 }
+
+// Держим кнопку в актуальном состоянии: показываем короткий адрес кошелька.
+tonConnectUI.onStatusChange((wallet) => {
+  const label = document.getElementById('ton-btn-label');
+  if (wallet) {
+    const a = wallet.account.address;
+    label.textContent = a.slice(0, 4) + '…' + a.slice(-4);
+  } else {
+    label.textContent = 'TON Connect';
+  }
+});
 
 // ==========================================
 // INIT
